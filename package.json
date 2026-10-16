@@ -3,7 +3,7 @@
 	"displayName": "FIX Master Plus",
 	"description": "FIX Protocol Formatter and Data Dictionary",
 	"icon": "images/fixMasterPlus.png",
-	"version": "2.3.0",
+	"version": "2.4.0",
 	"publisher": "maksym-silenko",
 	"license": "MIT",
 	"repository": {
