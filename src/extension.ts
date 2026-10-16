@@ -1,8 +1,8 @@
-import { window, ProgressLocation, ExtensionContext, commands, workspace, WorkspaceEdit, TextDocument, ViewColumn, Uri, languages, Hover, MarkdownString, Position, Range, TextEditor } from 'vscode';
+import { window, ProgressLocation, ExtensionContext, commands, workspace, WorkspaceEdit, TextDocument, ViewColumn, Uri, languages, Hover, MarkdownString, Position, Range, TextEditor, FileSystemWatcher, RelativePattern, Disposable } from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { Orchestra } from './fixOrchestra';
-import { DataDictionary } from './quickFixDataDictionary';
+import { DataDictionary, normalizeDictionaryInput, resolveDictionaryPaths } from './quickFixDataDictionary';
 import { fixMessagePrefix, parseMessage, prettyPrintMessage, msgTypeHeartbeat, msgTypeTestRequest, csvPrintMessage, Message, parsePrettyPrintedField } from './fixProtocol';
 import { AdministrativeMessageBehaviour, CommandScope, EditorReuse, NameLookup } from './options';
 import { definitionHtmlForField } from './html';
@@ -16,15 +16,32 @@ export function activate(context: ExtensionContext) {
 	let dataDictionary: DataDictionary | null = null;
 	const orderBook = new OrderBook();
 	let orderBookFields: MessageField[] = [];
+	let dictionaryWatchers: FileSystemWatcher[] = [];
+	let dictionaryReloadTimer: NodeJS.Timeout | undefined;
 
-	const getWorkspaceFolder = () : string | undefined => {
+	const disposeDictionaryWatchers = () => {
+		if (dictionaryReloadTimer) {
+			clearTimeout(dictionaryReloadTimer);
+			dictionaryReloadTimer = undefined;
+		}
+		for (const watcher of dictionaryWatchers) {
+			watcher.dispose();
+		}
+		dictionaryWatchers = [];
+	};
+
+	context.subscriptions.push(new Disposable(() => disposeDictionaryWatchers()));
+
+	const getWorkspaceFolder = (showError: boolean = true) : string | undefined => {
 		
-		if (!workspace.workspaceFolders) {
-			window.showErrorMessage("Unable to resolve ${workspaceFolder} - there are no workspaces available");
+		if (!workspace.workspaceFolders || workspace.workspaceFolders.length === 0) {
+			if (showError) {
+				window.showErrorMessage("Unable to resolve ${workspaceFolder} - there are no workspaces available");
+			}
 		  	return undefined;
 		}
 
-		return workspace.workspaceFolders[0].uri.path;
+		return workspace.workspaceFolders[0].uri.fsPath;
 	};
 
 	const resolvePathVariables = (path: string, context: string) : string | undefined => {
@@ -82,24 +99,68 @@ export function activate(context: ExtensionContext) {
 		});
 	};
 
-	const loadDataDictionary = () => {
+	const setupDictionaryWatchers = (resolvedFiles: string[]) => {
+		disposeDictionaryWatchers();
+
+		const watchedDirs = new Set<string>();
+		for (const file of resolvedFiles) {
+			watchedDirs.add(path.dirname(file));
+		}
+
+		const scheduleReload = () => {
+			if (dictionaryReloadTimer) {
+				clearTimeout(dictionaryReloadTimer);
+			}
+			dictionaryReloadTimer = setTimeout(() => {
+				dictionaryReloadTimer = undefined;
+				loadDataDictionary(true);
+			}, 300);
+		};
+
+		for (const dir of watchedDirs) {
+			const watcher = workspace.createFileSystemWatcher(new RelativePattern(Uri.file(dir), '*.xml'));
+			watcher.onDidChange(scheduleReload);
+			watcher.onDidCreate(scheduleReload);
+			watcher.onDidDelete(scheduleReload);
+			dictionaryWatchers.push(watcher);
+		}
+	};
+
+	const loadDataDictionary = (isReloadFromWatcher: boolean = false) => {
 		
 		dataDictionary = null;
 		const configuration = workspace.getConfiguration();
-		let path = configuration.get('fixmaster.quickFixDataDictionaryPath') as string | undefined;
+		const rawPathConfig = configuration.get<string | string[] | null>('fixmaster.quickFixDataDictionaryPath');
+		const patterns = normalizeDictionaryInput(rawPathConfig);
 		
-		if (!path) {
-			return;
-		}
-		
-		path = resolvePathVariables(path, "QuickFix data dictionary");
-		
-		if (path === undefined) {
+		if (patterns.length === 0) {
+			disposeDictionaryWatchers();
 			return;
 		}
 
-		if (!fs.existsSync(path as string)) {
-			window.showErrorMessage("The QuickFix data dictionary path '" + path + "' cannot be found.");
+		const workspaceRoot = getWorkspaceFolder(false);
+		if (patterns.some(p => p.includes('${workspaceFolder}')) && !workspaceRoot) {
+			window.showErrorMessage("Unable to determine ${workspaceFolder} when resolving the QuickFix data dictionary path.");
+			return;
+		}
+
+		const warnings: string[] = [];
+		const resolvedFiles = resolveDictionaryPaths(patterns, {
+			workspaceRoot,
+			onWarning: (msg) => {
+				console.warn(`[FIX Master] ${msg}`);
+				warnings.push(msg);
+			}
+		});
+
+		if (!isReloadFromWatcher) {
+			setupDictionaryWatchers(resolvedFiles);
+		}
+
+		if (resolvedFiles.length === 0) {
+			if (!isReloadFromWatcher && warnings.length > 0) {
+				window.showErrorMessage(warnings[0]);
+			}
 			return;
 		}
 
@@ -111,9 +172,12 @@ export function activate(context: ExtensionContext) {
 			return new Promise(resolve => {
 				setTimeout(async () => {
 					try {
-						dataDictionary = await DataDictionary.parse(path as string);
+						dataDictionary = await DataDictionary.parse(resolvedFiles, {
+							workspaceRoot,
+							onWarning: (msg) => console.warn(`[FIX Master] ${msg}`)
+						});
 					} catch (err) {
-						window.showErrorMessage("Unable to load a QuickFix data dictionary from '" + path + "' - " + err);
+						window.showErrorMessage("Unable to load QuickFix data dictionary - " + err);
 					}
 					resolve(undefined);
 				}, 0);

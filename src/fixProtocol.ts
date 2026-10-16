@@ -97,12 +97,19 @@ export class Message {
         
         if (msgTypeField && msgTypeField.value.length > 0) {
             const msgType = msgTypeField.value;
-            const messageDefinition = orchestra.definitionOfMessage(msgType, version);
+            let messageDefinition = orchestra.definitionOfMessage(msgType, version);
+            const qfMessageDefinition = quickFix ? quickFix.definitionOfMessage(msgType) : undefined;
+            if ((!messageDefinition || messageDefinition.name.length === 0) && qfMessageDefinition && qfMessageDefinition.name.length > 0) {
+                messageDefinition = qfMessageDefinition;
+            }
             const fieldDescriptions = this.fields.map(field => {
                 let definition = orchestra.definitionOfField(field.tag, version, messageDefinition);
                 // TODO - change this to return tag === NaN
-                if (definition?.field.description.length === 0 && quickFix) {
-                    definition = quickFix.definitionOfField(field.tag, undefined, undefined);
+                if ((!definition || definition.field.name.length === 0 || definition.field.description.length === 0) && quickFix) {
+                    const qfDefinition = quickFix.definitionOfField(field.tag, beginString?.value, qfMessageDefinition);
+                    if (qfDefinition && qfDefinition.field.name.length > 0) {
+                        definition = qfDefinition;
+                    }
                 }
                 let valueDescription = orchestra.descriptionOfValue(field.tag, field.value, version);
                 if (valueDescription.length === 0 && quickFix) {
@@ -127,10 +134,16 @@ export class Message {
         const fieldDescriptions = this.fields.map(field => {
             let definition = orchestra.definitionOfField(field.tag, version, undefined);
             // TODO - change this to return tag === NaN
-            if (definition?.field.description.length === 0 && quickFix) {
-                definition = quickFix.definitionOfField(field.tag, undefined, undefined);
+            if ((!definition || definition.field.name.length === 0 || definition.field.description.length === 0) && quickFix) {
+                const qfDefinition = quickFix.definitionOfField(field.tag, beginString?.value, undefined);
+                if (qfDefinition && qfDefinition.field.name.length > 0) {
+                    definition = qfDefinition;
+                }
             }
-            const valueDescription = orchestra.descriptionOfValue(field.tag, field.value, version);
+            let valueDescription = orchestra.descriptionOfValue(field.tag, field.value, version);
+            if (valueDescription.length === 0 && quickFix) {
+                valueDescription = quickFix.descriptionOfValue(field.tag, field.value);
+            }
             return new FieldDescription(field.tag, 
                                         field.value, 
                                         definition ? definition.field.name : "", 
@@ -365,7 +378,7 @@ export function csvPrintMessage(context: string, message: Message, orchestra: FI
     return buffer;
 }
 
-export function parsePrettyPrintedField(text: string, orchestra: FIX.Orchestra, _quickFix: DataDictionary | null): Field | null {
+export function parsePrettyPrintedField(text: string, orchestra: FIX.Orchestra, quickFix: DataDictionary | null): Field | null {
     //
     // BodyLength    (9) 0858
     //    MsgType   (35) X - MarketDataIncrementalRefresh
@@ -384,7 +397,7 @@ export function parsePrettyPrintedField(text: string, orchestra: FIX.Orchestra, 
     let value = match[2].trim();
 
     // If this is an enumerated field drop the description if there is one.
-    if (orchestra.isFieldEnumerated(tag, undefined)) {
+    if (orchestra.isFieldEnumerated(tag, undefined) || quickFix?.isFieldEnumerated(tag)) {
         const separatorIndex = value.lastIndexOf(" - ");
         if (separatorIndex >= 0) {
             value = value.substring(0, separatorIndex);

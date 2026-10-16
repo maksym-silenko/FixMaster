@@ -4,6 +4,17 @@ All notable changes to the **FIX Master** extension will be documented in this f
 
 This format is based on [Keep a Changelog](http://keepachangelog.com/).
 
+## [Unreleased]
+
+### Changed
+
+- Extended `fixmaster.quickFixDataDictionaryPath` to accept either a single path/glob string or an array of path/glob strings (`string[]`), resolving relative paths and `${workspaceFolder}` against the active workspace root.
+- Multiple resolved QuickFix XML data dictionaries are now merged in deterministic order (array order and lexicographical path order per glob), logging warnings when conflicting field, enum, or message definitions are overridden.
+
+### Added
+
+- Lightweight, debounced file system watchers on resolved QuickFix data dictionary directories so dictionary changes on disk automatically reload definitions.
+
 ## [2.3.0] 2026-10-16
 
 ### Changed

@@ -326,9 +326,17 @@
 					"description": "Path to a directory containing fixtrading.org Orchestrations. FIX Master includes a set of orchestrations that it will use by default."
 				},
 				"fixmaster.quickFixDataDictionaryPath": {
-					"type": "string",
+					"type": [
+						"string",
+						"array",
+						"null"
+					],
+					"items": {
+						"type": "string",
+						"minLength": 1
+					},
 					"default": null,
-					"description": "Path to a QuickFix Xml Data Dictionary."
+					"description": "Path(s) or glob pattern(s) to QuickFix XML Data Dictionary file(s). Accepts a single path/glob string or an array of path/glob strings."
 				},
 				"fixmaster.nameLookup": {
 					"type": "string",
