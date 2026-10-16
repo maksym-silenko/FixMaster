@@ -43,6 +43,39 @@ suite('FIX Protocol Test Suite', () => {
         assert.equal("INITIATOR", message.fields[4].value);
     });
 
+    test('Parse Message With List Of Field Delimiters', () => {
+        const pipeText = "8=FIX.4.4|9=72|35=A|49=ACCEPTOR|56=INITIATOR|34=1|52=20190816-10:34:27.742|98=0|108=30|10=012|";
+        const caretAText = "8=FIX.4.4^A9=72^A35=A^A49=ACCEPTOR^A56=INITIATOR^A34=1^A52=20190816-10:34:27.742^A98=0^A108=30^A10=012^A";
+        const sohText = "8=FIX.4.4\x019=72\x0135=A\x0149=ACCEPTOR\x0156=INITIATOR\x0134=1\x0152=20190816-10:34:27.742\x0198=0\x01108=30\x0110=012\x01";
+        const separators = ["|", "^A"];
+
+        const pipeMessage = parseMessage(pipeText, null, separators);
+        assert(pipeMessage, "pipe message failed to parse");
+        assert.equal(10, pipeMessage.fields.length);
+        assert.equal("INITIATOR", pipeMessage.fields[4].value);
+
+        const caretAMessage = parseMessage(caretAText, null, separators);
+        assert(caretAMessage, "^A message failed to parse");
+        assert.equal(10, caretAMessage.fields.length);
+        assert.equal("INITIATOR", caretAMessage.fields[4].value);
+
+        const sohMessage = parseMessage(sohText, null, separators);
+        assert(sohMessage, "SOH message failed to parse when custom separators list is provided");
+        assert.equal(10, sohMessage.fields.length);
+        assert.equal("INITIATOR", sohMessage.fields[4].value);
+    });
+
+    test('Parse Message Selects Most Frequent Delimiter From List', () => {
+        const text = "8=FIX.4.4|9=85|35=5|49=ACCEPTOR|56=INITIATOR|34=1|52=20190816-10:34:27.742|58=A^B^C|10=012|";
+        const message = parseMessage(text, null, ["^", "|"]);
+        if (!message) {
+            assert.fail("message failed to parse");
+            return;
+        }
+        assert.equal(9, message.fields.length);
+        assert.equal("A^B^C", message.fields[7].value);
+    });
+
     test('Parse Message Wtih Wrong Field Delimiter', () => {
         const text = "8=FIX.4.4|9=72|35=A|49=ACCEPTOR|56=INITIATOR|34=1|52=20190816-10:34:27.742|98=0|108=30|10=012|";
         const message = parseMessage(text);

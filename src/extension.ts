@@ -178,7 +178,7 @@ export function activate(context: ExtensionContext) {
 			if (fixMessageIndex < 0) {
 				return;
 			}
-			const fieldSeparator = configuration.get("fixmaster.fieldSeparator") as string;
+			const fieldSeparator = configuration.get<string | string[]>("fixmaster.fieldSeparator");
 			const nestedFieldIndent = configuration.get("fixmaster.nestedFieldIndent") as number;
 			const rawText = line.text.slice(fixMessageIndex);
 			const message = parseMessage(rawText, orchestra, fieldSeparator);	
@@ -286,7 +286,7 @@ export function activate(context: ExtensionContext) {
 		const configuration = workspace.getConfiguration();
 
 		const prefixPattern = configuration.get("fixmaster.prefixPattern") as string;
-		const fieldSeparator = configuration.get("fixmaster.fieldSeparator") as string;
+		const fieldSeparator = configuration.get<string | string[]>("fixmaster.fieldSeparator");
 		const nestedFieldIndent = configuration.get("fixmaster.nestedFieldIndent") as number;
 		const administrativeMessageBehaviour = AdministrativeMessageBehaviour[configuration.get("fixmaster.administrativeMessageBehaviour") as keyof typeof AdministrativeMessageBehaviour];
 

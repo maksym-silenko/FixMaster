@@ -4,6 +4,13 @@ All notable changes to the **FIX Master** extension will be documented in this f
 
 This format is based on [Keep a Changelog](http://keepachangelog.com/).
 
+## [2.3.0] 2026-10-16
+
+### Changed
+
+- Extended `fixmaster.fieldSeparator` to accept a list of field separators (including multi-character separators such as `^A`), with standard `0x01` (SOH) always included by default.
+- Automatically detect which separator from the configured list is used in each raw FIX message based on occurrence frequency.
+
 ## [2.2.0] 2025-12-24 
 
 ### Added

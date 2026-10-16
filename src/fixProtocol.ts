@@ -167,11 +167,43 @@ export class Message {
     }
 }
 
-export function parseMessage(text: string, orchestra: FIX.Orchestra | null = null, separator: string | undefined = undefined) {
+export function detectSeparator(text: string, separators?: string | string[]): string {
+    const candidates = new Set<string>([fieldDelimiter]);
 
-    if (!separator) {
-        separator = fieldDelimiter;
+    if (typeof separators === 'string') {
+        if (separators.length > 0) {
+            candidates.add(separators);
+        }
+    } else if (Array.isArray(separators)) {
+        for (const sep of separators) {
+            if (typeof sep === 'string' && sep.length > 0) {
+                candidates.add(sep);
+            }
+        }
     }
+
+    let bestSeparator = fieldDelimiter;
+    let maxCount = 0;
+
+    for (const candidate of candidates) {
+        let count = 0;
+        let pos = text.indexOf(candidate);
+        while (pos !== -1) {
+            ++count;
+            pos = text.indexOf(candidate, pos + candidate.length);
+        }
+        if (count > maxCount) {
+            maxCount = count;
+            bestSeparator = candidate;
+        }
+    }
+
+    return bestSeparator;
+}
+
+export function parseMessage(text: string, orchestra: FIX.Orchestra | null = null, separator: string | string[] | undefined = undefined) {
+
+    const resolvedSeparator = detectSeparator(text, separator);
 
     let msgType = null;
     const fields: Field[] = [];
@@ -182,13 +214,17 @@ export function parseMessage(text: string, orchestra: FIX.Orchestra | null = nul
         let tag: string = "";
         let value: string = "";
 
-        for (; index < length; ++index) {
-            const token = text[index];
-            if (token === fieldValueSeparator || token === separator) {
-                ++index;
+        while (index < length) {
+            if (text.startsWith(fieldValueSeparator, index)) {
+                index += fieldValueSeparator.length;
                 break;
             }
-            tag += token;
+            if (text.startsWith(resolvedSeparator, index)) {
+                index += resolvedSeparator.length;
+                break;
+            }
+            tag += text[index];
+            ++index;
         }
 
         const intTag = parseInt(tag);
@@ -215,19 +251,20 @@ export function parseMessage(text: string, orchestra: FIX.Orchestra | null = nul
             }
             value = Buffer.from(text.substring(index, index + length), 'binary').toString('base64');
             index += length;
-            if (text[index] !== separator) {
+            if (!text.startsWith(resolvedSeparator, index)) {
                 return null;
             }
+            index += resolvedSeparator.length;
         }
         else {
 
-            for (; index < length; ++index) {
-                const token = text[index];
-                if (token === separator) {
-                    ++index;
+            while (index < length) {
+                if (text.startsWith(resolvedSeparator, index)) {
+                    index += resolvedSeparator.length;
                     break;
                 }
-                value += token;
+                value += text[index];
+                ++index;
             }
         }
 
