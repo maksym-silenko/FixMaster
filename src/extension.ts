@@ -226,7 +226,7 @@ export function activate(context: ExtensionContext) {
 	});
 
 	languages.registerHoverProvider(
-		{ pattern: '**/*.*' }, 
+		'*', 
 		{ provideHover(document: TextDocument, position: Position) {
 			const configuration = workspace.getConfiguration();
 			const hoversEnabled = configuration.get("fixmaster.hoversEnabled") as boolean;
@@ -242,6 +242,7 @@ export function activate(context: ExtensionContext) {
 			if (fixMessageIndex < 0) {
 				return;
 			}
+			orchestra.nameLookup = NameLookup[configuration.get('fixmaster.nameLookup') as keyof typeof NameLookup];
 			const fieldSeparator = configuration.get<string | string[]>("fixmaster.fieldSeparator");
 			const nestedFieldIndent = configuration.get("fixmaster.nestedFieldIndent") as number;
 			const rawText = line.text.slice(fixMessageIndex);

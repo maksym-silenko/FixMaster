@@ -15,6 +15,10 @@ This format is based on [Keep a Changelog](http://keepachangelog.com/).
 
 - Lightweight, debounced file system watchers on resolved QuickFix data dictionary directories so dictionary changes on disk automatically reload definitions.
 
+### Fixed
+
+- Fixed hover tooltips not triggering on files without a file extension (e.g., `file_without_extension`) or untitled buffers, and ensured `fixmaster.nameLookup` is respected when hovering.
+
 ## [2.3.0] 2026-10-16
 
 ### Changed
