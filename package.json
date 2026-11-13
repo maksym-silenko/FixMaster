@@ -8,10 +8,10 @@
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/maksym-silenko/FixMaster.git"
+		"url": "https://github.com/maksym-silenko/fixmaster-plus.git"
 	},
 	"bugs": {
-		"url": "https://github.com/maksym-silenko/FixMaster/issues"
+		"url": "https://github.com/maksym-silenko/fixmaster-plus/issues"
 	},
 	"author": {
 		"name": "Maksym Silenko"
